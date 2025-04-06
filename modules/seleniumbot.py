@@ -114,9 +114,10 @@ class AccountCreator():
 
         except Exception as e:
             print(f"[FATAL ERROR] {e}")
-
+"""
         finally:
             driver.quit()
+"""
 
     def creation_config(self):
         try:
