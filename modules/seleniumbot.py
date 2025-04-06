@@ -91,11 +91,19 @@ class AccountCreator():
 
         sleep(2)
 
-        submit = driver.find_element(By.XPATH, '//*[@id="react-root"]/section/main/div/div/div[1]/div/form/div[7]/div/button')
-
-        action_chains.move_to_element(submit)
-        sleep(2)
-        submit.click()
+        try:
+            # Attempting to locate the submit button with a fallback approach
+            submit_button = driver.find_element(By.XPATH, '//button[contains(@type, "submit")]')
+            submit_button.click()
+        except Exception as e:
+            print(f"Error during submit button click: {e}")
+            try:
+                # Fallback: use CSS selector or another element
+                submit_button = driver.find_element(By.CSS_SELECTOR, 'button[type="submit"]')
+                submit_button.click()
+            except Exception as fallback_e:
+                print(f"Fallback failed: {fallback_e}")
+                pass
 
         sleep(3)
 
@@ -181,4 +189,3 @@ class AccountCreator():
 def runbot():
     account = AccountCreator(config.Config['use_custom_proxy'], config.Config['use_local_ip_address'])
     account.creation_config()
-
