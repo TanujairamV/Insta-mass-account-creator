@@ -21,7 +21,7 @@ Config = {
     "amount_of_account": 1, #amount of account you want to create make sure it doesnt exceed 50 for better performance
     "amount_per_proxy": 1, #this would be amont of account used if you have a you are using multiple proxies
     "proxy_file_path" : ASSET_DIR + "/proxies.txt",
-    "email_domain": "1secmail.com",
+    #"email_domain": "1secmail.com",
     "country": "it",
     "activation_email_addr": "xxxxxxxxxxxxxxxx",
     "activation_email_pass": "xxxxxxxxxxxxxxxx",
