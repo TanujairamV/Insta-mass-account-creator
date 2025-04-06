@@ -1,16 +1,6 @@
-""" author: feezyhendrix
-
-    main function botcore
- """
-
-import json
-from time import sleep
+import logging
+import time
 from random import randint
-
-import modules.config as config
-import modules.generateaccountinformation as accnt
-from modules.storeusername import store
-
 from selenium import webdriver
 from selenium.webdriver import ActionChains
 from selenium.webdriver.common.by import By
@@ -18,61 +8,22 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-import requests
-import re
-import logging
+import modules.config as config
+import modules.generateaccountinformation as accnt
+from modules.storeusername import store
+from modules.tempmail import TempMailClient
 
-MAIL_TM_BASE = "https://api.mail.tm"
-
-def get_mail_tm_account():
-    domain = requests.get(f"{MAIL_TM_BASE}/domains").json()["hydra:member"][0]["domain"]
-    username = f"user{randint(10000,99999)}@{domain}"
-    password = "Password123!"
-    
-    # Register account
-    requests.post(f"{MAIL_TM_BASE}/accounts", json={"address": username, "password": password})
-    
-    # Get token
-    r = requests.post(f"{MAIL_TM_BASE}/token", json={"address": username, "password": password})
-    token = r.json()["token"]
-
-    logging.info(f"Email: {username}")
-    return username, password, token
-
-def get_confirmation_code(token):
-    headers = {"Authorization": f"Bearer {token}"}
-    logging.info("[INFO] Waiting for confirmation code...")
-    
-    for _ in range(30):
-        resp = requests.get(f"{MAIL_TM_BASE}/messages", headers=headers).json()
-        if resp["hydra:member"]:
-            message_id = resp["hydra:member"][0]["id"]
-            msg = requests.get(f"{MAIL_TM_BASE}/messages/{message_id}", headers=headers).json()
-            match = re.search(r'(\d{6})', msg["text"])
-            if match:
-                code = match.group(1)
-                logging.info(f"[INFO] Confirmation code received: {code}")
-                return code
-        sleep(2)
-    logging.error("[ERROR] No confirmation code received.")
-    return None
+logging.basicConfig(level=logging.INFO)
 
 class AccountCreator():
-    account_created = 0
-
     def __init__(self, use_custom_proxy, use_local_ip_address):
-        self.sockets = []
         self.use_custom_proxy = use_custom_proxy
         self.use_local_ip_address = use_local_ip_address
-        self.url = 'https://www.instagram.com/accounts/emailsignup/'
-        self.__collect_sockets()
 
-    def __collect_sockets(self):
-        r = requests.get("https://www.sslproxies.org/")
-        matches = re.findall(r"<td>\d+.\d+.\d+.\d+</td><td>\d+</td>", r.text)
-        revised_list = [m1.replace("<td>", "") for m1 in matches]
-        for socket_str in revised_list:
-            self.sockets.append(socket_str[:-5].replace("</td>", ":"))
+    def human_typing(self, element, text):
+        for char in text:
+            element.send_keys(char)
+            time.sleep(0.1)
 
     def createaccount(self, proxy=None):
         options = Options()
@@ -85,119 +36,101 @@ class AccountCreator():
         driver = webdriver.Chrome(service=service, options=options)
 
         try:
-            print('Opening Browser')
-            driver.get(self.url)
-            print('Browser Opened')
-
-            wait = WebDriverWait(driver, 15)
+            logging.info("Opening Browser")
+            driver.get('https://www.instagram.com/accounts/emailsignup/')
+            wait = WebDriverWait(driver, 20)
             action_chains = ActionChains(driver)
 
-            mail_email, mail_password, mail_token = get_mail_tm_account()
-            account_info = accnt.new_account()
-            account_info["email"] = mail_email
+            tm = TempMailClient()
+            email = tm.create_account()
+            account_info = accnt.new_account(email=email)
+            logging.info(f"Email: {email}")
+            logging.info(f"Gender: {account_info['gender']}")
+            logging.info(f"Url generated: {account_info['url']}")
+            logging.info(f"Birthday: {account_info['birthday']}")
+            logging.info(f"Username: {account_info['username']}")
 
-            # Fill email
-            print('Filling email field')
+            # Form filling with human typing
             email_field = wait.until(EC.presence_of_element_located((By.NAME, 'emailOrPhone')))
-            email_field.send_keys(str(account_info["email"]))
-            sleep(1)
+            self.human_typing(email_field, str(account_info["email"]))
+            time.sleep(1)
 
-            # Fill full name
-            print('Filling fullname field')
             fullname_field = driver.find_element(By.NAME, 'fullName')
-            fullname_field.send_keys(account_info["name"])
-            sleep(1)
+            self.human_typing(fullname_field, account_info["name"])
+            time.sleep(1)
 
-            # Fill username
-            print('Filling username field')
             username_field = driver.find_element(By.NAME, 'username')
-            username_field.send_keys(account_info["username"])
-            sleep(1)
+            self.human_typing(username_field, account_info["username"])
+            time.sleep(3)
 
-            # Fill password
-            print('Filling password field')
             password_field = driver.find_element(By.NAME, 'password')
-            password_field.send_keys(str(account_info["password"]))
-            sleep(1)
+            self.human_typing(password_field, str(account_info["password"]))
+            time.sleep(2)
 
-            # Submit signup
-            print('Clicking signup button')
+            # Check if username is valid (error label)
+            error_check = driver.find_elements(By.XPATH, '//p[@id="ssfErrorAlert"]')
+            if error_check:
+                print("[ERROR] Username or input not valid. Skipping...")
+                driver.quit()
+                return
+
             submit_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[type="submit"]')))
             action_chains.move_to_element(submit_button).click().perform()
-            sleep(5)
+            time.sleep(5)
 
-            # Fill birthday
+            # Birthday form
             birthday = account_info["birthday"].split(" ")
             try:
-                print('Filling birthday details')
+                logging.info("Filling birthday details")
                 month_select = wait.until(EC.presence_of_element_located((By.XPATH, '//select[@title="Month:"]')))
                 month_select.send_keys(birthday[0])
-                sleep(1)
+                time.sleep(1)
 
                 day_select = driver.find_element(By.XPATH, '//select[@title="Day:"]')
                 day_select.send_keys(birthday[1][:-1])
-                sleep(1)
+                time.sleep(1)
 
                 year_select = driver.find_element(By.XPATH, '//select[@title="Year:"]')
                 year_select.send_keys(birthday[2])
-                sleep(1)
+                time.sleep(1)
 
                 next_button = driver.find_element(By.XPATH, '//button[text()="Next"]')
                 next_button.click()
-                sleep(3)
+                time.sleep(3)
             except Exception as e:
                 print(f"[WARNING] Skipping birthday selection: {e}")
 
-            # Wait for and enter confirmation code
-            code = get_confirmation_code(mail_token)
-            if code:
-                code_input = wait.until(EC.presence_of_element_located((By.NAME, 'email_confirmation_code')))
-                code_input.send_keys(code)
-                sleep(2)
-                confirm_btn = driver.find_element(By.XPATH, '//button[text()="Next"]')
-                confirm_btn.click()
-                sleep(3)
+            # Wait for confirmation code from mail.tm
+            logging.info("[INFO] Waiting for confirmation code...")
+            code = tm.wait_for_code(email)
+            if not code:
+                logging.error("[ERROR] No code received")
+                driver.quit()
+                return
+
+            confirmation_input = wait.until(EC.presence_of_element_located((By.NAME, 'email_confirmation_code')))
+            confirmation_input.send_keys(code)
+            time.sleep(2)
+
+            confirm_button = driver.find_element(By.XPATH, '//button[text()="Next"]')
+            confirm_button.click()
+            time.sleep(5)
 
             store(account_info)
-            print(f"[INFO] Account created: {account_info['username']}")
-            print(f"[INFO] Username: {account_info['username']}")
-            print(f"[INFO] Password: {account_info['password']}")
+            print(f"[SUCCESS] Account created: {account_info['username']} | Password: {account_info['password']}")
 
         except Exception as e:
             print(f"[FATAL ERROR] {e}")
+        finally:
+            pass  # Change to driver.quit() if you don't want to keep the browser open
 
     def creation_config(self):
         try:
-            if not self.use_local_ip_address:
-                if not self.use_custom_proxy:
-                    for _ in range(config.Config['amount_of_account']):
-                        if self.sockets:
-                            current_socket = self.sockets.pop(0)
-                            try:
-                                self.createaccount(current_socket)
-                            except Exception as e:
-                                print(f'Error! Trying another Proxy: {current_socket} => {e}')
-                                self.createaccount(current_socket)
-                else:
-                    with open(config.Config['proxy_file_path'], 'r') as file:
-                        content = file.read().splitlines()
-                        for proxy in content:
-                            amount_per_proxy = config.Config['amount_per_proxy']
-                            count = amount_per_proxy if amount_per_proxy != 0 else randint(1, 20)
-                            print(f"Creating {count} accounts for this proxy")
-                            for _ in range(count):
-                                try:
-                                    self.createaccount(proxy)
-                                except Exception as e:
-                                    print(f"An error has occurred: {e}")
-            else:
-                for _ in range(config.Config['amount_of_account']):
-                    try:
-                        self.createaccount()
-                    except Exception as e:
-                        print(f'Error! Check — your IP might be banned. Reason: {e}')
-                        self.createaccount()
-
+            for _ in range(config.Config['amount_of_account']):
+                try:
+                    self.createaccount()
+                except Exception as e:
+                    print(f"[ERROR] Something went wrong: {e}")
         except Exception as e:
             print(f"[FATAL ERROR] {e}")
 
