@@ -16,7 +16,7 @@ from selenium.webdriver import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.support.ui import WebDriverWait, Select
+from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import requests
 import re
@@ -95,25 +95,31 @@ class AccountCreator():
                 submit_button.click()
             sleep(5)
 
-            # Fill birthday
+            # Fill birthday (Custom dropdown)
             birthday = account_info["birthday"].split(" ")
             try:
                 print('Filling birthday details')
                 sleep(3)  # let transition complete
 
                 # Month
-                month_select = wait.until(EC.presence_of_element_located((By.XPATH, '//select[contains(@aria-label, "Month")]')))
-                Select(month_select).select_by_visible_text(birthday[0])
+                month_element = wait.until(EC.presence_of_element_located((By.XPATH, '//div[@aria-label="Month"]')))
+                month_element.click()
+                month_option = wait.until(EC.presence_of_element_located((By.XPATH, f'//div[text()="{birthday[0]}"]')))
+                month_option.click()
                 sleep(0.5)
 
                 # Day
-                day_select = wait.until(EC.presence_of_element_located((By.XPATH, '//select[contains(@aria-label, "Day")]')))
-                Select(day_select).select_by_visible_text(birthday[1].replace(',', ''))
+                day_element = wait.until(EC.presence_of_element_located((By.XPATH, '//div[@aria-label="Day"]')))
+                day_element.click()
+                day_option = wait.until(EC.presence_of_element_located((By.XPATH, f'//div[text()="{birthday[1].replace(",", "")}"]')))
+                day_option.click()
                 sleep(0.5)
 
                 # Year
-                year_select = wait.until(EC.presence_of_element_located((By.XPATH, '//select[contains(@aria-label, "Year")]')))
-                Select(year_select).select_by_visible_text(birthday[2])
+                year_element = wait.until(EC.presence_of_element_located((By.XPATH, '//div[@aria-label="Year"]')))
+                year_element.click()
+                year_option = wait.until(EC.presence_of_element_located((By.XPATH, f'//div[text()="{birthday[2]}"]')))
+                year_option.click()
                 sleep(0.5)
 
                 # Next Button
@@ -173,4 +179,3 @@ class AccountCreator():
 def runbot():
     account = AccountCreator(config.Config['use_custom_proxy'], config.Config['use_local_ip_address'])
     account.creation_config()
-
