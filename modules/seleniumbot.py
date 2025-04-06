@@ -1,167 +1,161 @@
-import time
 import logging
-import requests
-import json
 import re
-from random import randint
+import requests
 from time import sleep
+from random import randint
 from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver import ActionChains
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 
-from modules.config import Config
-from modules.generateaccountinformation import new_account
+import modules.config as config
+import modules.generateaccountinformation as accnt
 from modules.storeusername import store
-
-# Mail.tm client using API
-class TempMailClient:
-    def __init__(self):
-        self.base_url = "https://api.mail.tm"
-        self.domain = self._get_domain()
-        self.address = None
-        self.password = None
-        self.token = None
-        self.account_id = None
-
-    def _get_domain(self):
-        res = requests.get(f"{self.base_url}/domains")
-        domains = res.json()["hydra:member"]
-        return domains[0]["domain"]
-
-    def create_account(self):
-        name = "user" + str(randint(10000, 99999))
-        email = f"{name}@{self.domain}"
-        password = "TestPassword123"
-        data = {
-            "address": email,
-            "password": password
-        }
-        res = requests.post(f"{self.base_url}/accounts", json=data)
-        if res.status_code != 201:
-            raise Exception(f"Could not create mail.tm account: {res.text}")
-        self.address = email
-        self.password = password
-        logging.info(f"Email: {self.address}")
-        return self.address
-
-    def login(self):
-        data = {
-            "address": self.address,
-            "password": self.password
-        }
-        res = requests.post(f"{self.base_url}/token", json=data)
-        if res.status_code != 200:
-            raise Exception(f"Login failed: {res.text}")
-        self.token = res.json()["token"]
-        self.account_id = res.json()["id"]
-
-    def get_confirmation_code(self):
-        headers = {
-            "Authorization": f"Bearer {self.token}"
-        }
-        for _ in range(60):  # Wait up to 60 seconds
-            logging.info("[INFO] Waiting for confirmation code...")
-            res = requests.get(f"{self.base_url}/messages", headers=headers)
-            msgs = res.json()["hydra:member"]
-            if msgs:
-                for msg in msgs:
-                    if "Instagram" in msg["from"]["address"] or "confirmation" in msg["subject"].lower():
-                        message_url = f'{self.base_url}/messages/{msg["id"]}'
-                        msg_res = requests.get(message_url, headers=headers)
-                        code_match = re.search(r'>(\d{6})<', msg_res.text)
-                        if code_match:
-                            return code_match.group(1)
-            time.sleep(5)
-        raise Exception("Confirmation code not received.")
+from modules.tempmail import TempMailClient
 
 class AccountCreator:
-    def __init__(self, use_custom_proxy=False, use_local_ip_address=True):
+    def __init__(self, use_custom_proxy, use_local_ip_address):
         self.use_custom_proxy = use_custom_proxy
         self.use_local_ip_address = use_local_ip_address
+        self.sockets = []
         self.url = 'https://www.instagram.com/accounts/emailsignup/'
+        self.__collect_sockets()
 
-    def createaccount(self):
-        options = Options()
-        options.add_argument('--disable-blink-features=AutomationControlled')
-        options.add_argument("--window-size=1200,600")
-        options.add_argument("--disable-notifications")
-        options.add_argument("--disable-popup-blocking")
-        service = Service(executable_path=Config['chromedriver_path'])
-        driver = webdriver.Chrome(service=service, options=options)
+    def __collect_sockets(self):
+        try:
+            r = requests.get("https://www.sslproxies.org/")
+            matches = re.findall(r"<td>\d+.\d+.\d+.\d+</td><td>\d+</td>", r.text)
+            revised_list = [m1.replace("<td>", "") for m1 in matches]
+            for socket_str in revised_list:
+                self.sockets.append(socket_str[:-5].replace("</td>", ":"))
+        except Exception as e:
+            logging.warning(f"[WARNING] Could not fetch proxies: {e}")
+
+    def createaccount(self, proxy=None):
+        chrome_options = webdriver.ChromeOptions()
+        if proxy:
+            chrome_options.add_argument(f'--proxy-server={proxy}')
+        chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)')
+        chrome_options.add_argument('window-size=1200x600')
+
+        driver = webdriver.Chrome(options=chrome_options, executable_path=config.Config['chromedriver_path'])
+        logging.info("Opening Browser")
+        driver.get(self.url)
+        logging.info("Browser Opened")
+        sleep(5)
 
         try:
-            logging.info("Opening Browser")
-            driver.get(self.url)
-            wait = WebDriverWait(driver, 15)
-            action = ActionChains(driver)
+            action_chains = ActionChains(driver)
+            account_info = accnt.new_account()
 
+            # Mail.tm account setup
             mail_client = TempMailClient()
-            email = mail_client.create_account()
-            mail_client.login()
+            mail_address = mail_client.address
+            logging.info(f"Email: {mail_address}")
+            account_info['email'] = mail_address
 
-            acc = new_account()
-            acc['email'] = email
-
-            # Fill signup form
+            # Fill in form
             logging.info("Filling email field")
-            wait.until(EC.presence_of_element_located((By.NAME, 'emailOrPhone'))).send_keys(acc["email"])
+            email_field = driver.find_element(By.NAME, 'emailOrPhone')
+            email_field.send_keys(mail_address)
             sleep(1)
 
             logging.info("Filling fullname field")
-            driver.find_element(By.NAME, 'fullName').send_keys(acc["name"])
+            full_field = driver.find_element(By.NAME, 'fullName')
+            full_field.send_keys(account_info["name"])
             sleep(1)
 
             logging.info("Filling username field")
-            driver.find_element(By.NAME, 'username').send_keys(acc["username"])
+            user_field = driver.find_element(By.NAME, 'username')
+            user_field.send_keys(account_info["username"])
             sleep(1)
 
             logging.info("Filling password field")
-            driver.find_element(By.NAME, 'password').send_keys(acc["password"])
-            sleep(1)
+            pass_field = driver.find_element(By.NAME, 'password')
+            pass_field.send_keys(account_info["password"])
+            sleep(2)
 
             logging.info("Clicking signup button")
-            submit_btn = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[type="submit"]')))
-            action.move_to_element(submit_btn).click().perform()
+            signup_btn = driver.find_element(By.XPATH, '//form//button[@type="submit"]')
+            action_chains.move_to_element(signup_btn).perform()
+            signup_btn.click()
             sleep(5)
 
-            # Fill birthday
-            birthday = acc["birthday"].split(" ")
+            # Select Birthday
+            logging.info("Filling birthday details")
             try:
-                logging.info("Filling birthday details")
-                month = wait.until(EC.presence_of_element_located((By.XPATH, '//select[@title="Month:"]')))
-                month.send_keys(birthday[0])
-                sleep(1)
-                day = driver.find_element(By.XPATH, '//select[@title="Day:"]')
-                day.send_keys(birthday[1][:-1])
-                sleep(1)
-                year = driver.find_element(By.XPATH, '//select[@title="Year:"]')
-                year.send_keys(birthday[2])
-                sleep(1)
+                month, day, year = account_info["birthday"].split(" ")
+                month_select = driver.find_element(By.XPATH, '//select[@title="Month:"]')
+                day_select = driver.find_element(By.XPATH, '//select[@title="Day:"]')
+                year_select = driver.find_element(By.XPATH, '//select[@title="Year:"]')
 
-                next_btn = driver.find_element(By.XPATH, '//button[text()="Next"]')
-                next_btn.click()
-                sleep(3)
+                month_select.send_keys(month)
+                day_select.send_keys(day.replace(",", ""))
+                year_select.send_keys(year)
+
+                sleep(1)
+                next_button = driver.find_element(By.XPATH, '//button[contains(text(), "Next")]')
+                next_button.click()
+                logging.info("Birthday submitted")
             except Exception as e:
                 logging.warning(f"[WARNING] Skipping birthday selection: {e}")
 
             # Wait for confirmation code
-            confirmation_code = mail_client.get_confirmation_code()
-            logging.info(f"Confirmation code received: {confirmation_code}")
+            logging.info("[INFO] Waiting for confirmation code...")
+            code = None
+            for _ in range(30):
+                code = mail_client.get_latest_code()
+                if code:
+                    break
+                sleep(2)
 
-            code_input = wait.until(EC.presence_of_element_located((By.NAME, "email_confirmation_code")))
-            code_input.send_keys(confirmation_code)
+            if code:
+                logging.info(f"[INFO] Confirmation code received: {code}")
+                input_box = driver.find_element(By.NAME, 'email_confirmation_code')
+                input_box.send_keys(code)
+                confirm_btn = driver.find_element(By.XPATH, '//button[contains(text(), "Next")]')
+                confirm_btn.click()
+            else:
+                logging.error("[ERROR] No confirmation code received.")
 
-            confirm_btn = driver.find_element(By.XPATH, '//button[text()="Next"]')
-            confirm_btn.click()
+            # Store account
+            store(account_info)
+            logging.info(f"Account created: {account_info['username']}")
 
-            store(acc)
-            logging.info(f"[SUCCESS] Account created: {acc['username']} | Password: {acc['password']}")
+        except Exception as e:
+            logging.error(f"[FATAL ERROR] {e}")
+        finally:
+            driver.quit()
+
+    def creation_config(self):
+        try:
+            if not self.use_local_ip_address:
+                if not self.use_custom_proxy:
+                    for _ in range(config.Config['amount_of_account']):
+                        if self.sockets:
+                            current_socket = self.sockets.pop(0)
+                            try:
+                                self.createaccount(current_socket)
+                            except Exception as e:
+                                logging.error(f"Proxy error {current_socket}: {e}")
+                else:
+                    with open(config.Config['proxy_file_path'], 'r') as file:
+                        proxies = file.read().splitlines()
+                        for proxy in proxies:
+                            for _ in range(config.Config.get('amount_per_proxy', 1)):
+                                try:
+                                    self.createaccount(proxy)
+                                except Exception as e:
+                                    logging.error(f"Proxy error {proxy}: {e}")
+            else:
+                for _ in range(config.Config['amount_of_account']):
+                    try:
+                        self.createaccount()
+                    except Exception as e:
+                        logging.error(f"Error with local IP: {e}")
         except Exception as e:
             logging.error(f"[FATAL ERROR] {e}")
 
 def runbot():
-    AccountCreator(Config['use_custom_proxy'], Config['use_local_ip_address']).createaccount()
+    creator = AccountCreator(config.Config['use_custom_proxy'], config.Config['use_local_ip_address'])
+    creator.creation_config()
