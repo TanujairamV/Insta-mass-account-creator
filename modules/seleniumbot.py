@@ -1,10 +1,11 @@
 """ author: feezyhendrix
 
     main function botcore
-"""
+ """
 
 from time import sleep
 from random import randint
+
 import modules.config as config
 import modules.generateaccountinformation as accnt
 from modules.storeusername import store
@@ -12,12 +13,12 @@ from modules.storeusername import store
 from selenium import webdriver
 from selenium.webdriver import ActionChains
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 import requests
 import re
-import logging
-
 
 class AccountCreator():
     account_created = 0
@@ -31,96 +32,91 @@ class AccountCreator():
 
     def __collect_sockets(self):
         r = requests.get("https://www.sslproxies.org/")
-        matches = re.findall(r"<td>\d+\.\d+\.\d+\.\d+</td><td>\d+</td>", r.text)
+        matches = re.findall(r"<td>\d+.\d+.\d+.\d+</td><td>\d+</td>", r.text)
         revised_list = [m1.replace("<td>", "") for m1 in matches]
         for socket_str in revised_list:
             self.sockets.append(socket_str[:-5].replace("</td>", ":"))
 
     def createaccount(self, proxy=None):
-        chrome_options = webdriver.ChromeOptions()
-
+        options = Options()
         if proxy:
-            chrome_options.add_argument('--proxy-server=%s' % proxy)
+            options.add_argument(f'--proxy-server={proxy}')
 
-        chrome_options.add_argument('--user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.80 Safari/537.36"')
-        chrome_options.add_argument('window-size=1200x600')
+        options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.80 Safari/537.36')
+        options.add_argument('window-size=1200x600')
 
-        service = Service(config.Config['chromedriver_path'])
-        driver = webdriver.Chrome(service=service, options=chrome_options)
+        service = Service(executable_path=config.Config['chromedriver_path'])
+        driver = webdriver.Chrome(service=service, options=options)
 
-        logging.info("Opening Browser")
-        driver.get(self.url)
-
-        sleep(5)
-        action_chains = ActionChains(driver)
-        sleep(5)
-
-        account_info = accnt.new_account()
-
-        # Fill email
-        logging.info("Filling email")
-        email_field = driver.find_element(By.NAME, 'emailOrPhone')
-        action_chains.move_to_element(email_field)
-        email_field.send_keys(account_info["email"])
-        sleep(2)
-
-        # Fill full name
-        logging.info("Filling full name")
-        fullname_field = driver.find_element(By.NAME, 'fullName')
-        action_chains.move_to_element(fullname_field)
-        fullname_field.send_keys(account_info["name"])
-        sleep(2)
-
-        # Fill username
-        logging.info("Filling username")
-        username_field = driver.find_element(By.NAME, 'username')
-        action_chains.move_to_element(username_field)
-        username_field.send_keys(account_info["username"])
-        sleep(2)
-
-        # Fill password
-        logging.info("Filling password")
-        password_field = driver.find_element(By.NAME, 'password')
-        action_chains.move_to_element(password_field)
-        password_field.send_keys(account_info["password"])
-        sleep(2)
-
-        # Click Sign up
-        submit = driver.find_element(By.XPATH, '//button[@type="submit"]')
-        action_chains.move_to_element(submit)
-        sleep(2)
-        submit.click()
-        sleep(5)
-
-        # Fill birthday
         try:
-            logging.info("Filling birthday")
-            birthday_parts = account_info["birthday"].split(" ")
-            month, day, year = birthday_parts[0], birthday_parts[1][:-1], birthday_parts[2]
+            print('Opening Browser')
+            driver.get(self.url)
+            print('Browser Opened')
 
-            month_dropdown = driver.find_element(By.XPATH, '//*[@id="react-root"]/section/main/div/div/div[1]/div/div[4]/div/div/span/span[1]/select')
-            day_dropdown = driver.find_element(By.XPATH, '//*[@id="react-root"]/section/main/div/div/div[1]/div/div[4]/div/div/span/span[2]/select')
-            year_dropdown = driver.find_element(By.XPATH, '//*[@id="react-root"]/section/main/div/div/div[1]/div/div[4]/div/div/span/span[3]/select')
+            wait = WebDriverWait(driver, 15)
+            action_chains = ActionChains(driver)
+            account_info = accnt.new_account()
 
-            month_dropdown.send_keys(month)
-            day_dropdown.send_keys(day)
-            year_dropdown.send_keys(year)
+            # Fill email
+            print('Filling email field')
+            email_field = wait.until(EC.presence_of_element_located((By.NAME, 'emailOrPhone')))
+            email_field.send_keys(str(account_info["email"]))
+            sleep(1)
 
-            sleep(2)
+            # Fill full name
+            print('Filling fullname field')
+            fullname_field = driver.find_element(By.NAME, 'fullName')
+            fullname_field.send_keys(account_info["name"])
+            sleep(1)
 
-            next_button = driver.find_element(By.XPATH, '//*[@id="react-root"]/section/main/div/div/div[1]/div/div[6]/button')
-            next_button.click()
+            # Fill username
+            print('Filling username field')
+            username_field = driver.find_element(By.NAME, 'username')
+            username_field.send_keys(account_info["username"])
+            sleep(1)
+
+            # Fill password
+            print('Filling password field')
+            password_field = driver.find_element(By.NAME, 'password')
+            password_field.send_keys(str(account_info["password"]))
+            sleep(1)
+
+            # Submit signup
+            print('Clicking signup button')
+            submit_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[type="submit"]')))
+            action_chains.move_to_element(submit_button).click().perform()
+            sleep(5)
+
+            # Fill birthday
+            birthday = account_info["birthday"].split(" ")
+            try:
+                print('Filling birthday details')
+                month_select = wait.until(EC.presence_of_element_located((By.XPATH, '//select[@title="Month:"]')))
+                month_select.send_keys(birthday[0])
+                sleep(1)
+
+                day_select = driver.find_element(By.XPATH, '//select[@title="Day:"]')
+                day_select.send_keys(birthday[1][:-1])
+                sleep(1)
+
+                year_select = driver.find_element(By.XPATH, '//select[@title="Year:"]')
+                year_select.send_keys(birthday[2])
+                sleep(1)
+
+                next_button = driver.find_element(By.XPATH, '//button[text()="Next"]')
+                next_button.click()
+                sleep(3)
+            except Exception as e:
+                print(f"[WARNING] Skipping birthday selection: {e}")
+
+            store(account_info)
+            print(f"[INFO] Account created: {account_info['username']}")
 
         except Exception as e:
-            logging.warning(f"Birthday input failed: {e}")
+            print(f"[FATAL ERROR] {e}")
 
-        sleep(4)
-
-        # Save account
-        store(account_info)
-
-        # driver.get(confirm_url) — can be used if activation is added
-        driver.quit()
+        finally:
+            driver.quit()
 
     def creation_config(self):
         try:
@@ -132,29 +128,31 @@ class AccountCreator():
                             try:
                                 self.createaccount(current_socket)
                             except Exception as e:
-                                logging.warning(f"Error!, Retrying with proxy {current_socket}: {e}")
-                                continue
+                                print(f'Error! Trying another Proxy: {current_socket} => {e}')
+                                self.createaccount(current_socket)
                 else:
                     with open(config.Config['proxy_file_path'], 'r') as file:
-                        proxies = file.read().splitlines()
-                        for proxy in proxies:
-                            amount = config.Config.get('amount_per_proxy', 0) or randint(1, 20)
-                            logging.info(f"Creating {amount} users with proxy {proxy}")
-                            for _ in range(amount):
+                        content = file.read().splitlines()
+                        for proxy in content:
+                            amount_per_proxy = config.Config['amount_per_proxy']
+                            count = amount_per_proxy if amount_per_proxy != 0 else randint(1, 20)
+
+                            print(f"Creating {count} accounts for this proxy")
+                            for _ in range(count):
                                 try:
                                     self.createaccount(proxy)
                                 except Exception as e:
-                                    logging.warning(f"Proxy error: {e}")
+                                    print(f"An error has occurred: {e}")
             else:
                 for _ in range(config.Config['amount_of_account']):
                     try:
                         self.createaccount()
                     except Exception as e:
-                        logging.error(f"Error with local IP: {e}")
-                        continue
-        except Exception as e:
-            logging.critical(f"Fatal Error: {e}")
+                        print(f'Error! Check — your IP might be banned. Reason: {e}')
+                        self.createaccount()
 
+        except Exception as e:
+            print(f"[FATAL ERROR] {e}")
 
 def runbot():
     account = AccountCreator(config.Config['use_custom_proxy'], config.Config['use_local_ip_address'])
