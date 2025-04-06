@@ -84,7 +84,16 @@ class AccountCreator():
             # Submit signup
             print('Clicking signup button')
             submit_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[type="submit"]')))
-            action_chains.move_to_element(submit_button).click().perform()
+            try:
+                print('Trying ActionChains click')
+                action_chains.move_to_element(submit_button).click().perform()
+            except:
+                try:
+                    print('Trying JavaScript click')
+                    driver.execute_script("arguments[0].click();", submit_button)
+                except:
+                    print('Trying regular click')
+                    submit_button.click()
             sleep(5)
 
             # Fill birthday
