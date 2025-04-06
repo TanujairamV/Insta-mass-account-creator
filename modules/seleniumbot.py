@@ -101,28 +101,35 @@ class AccountCreator():
                 print('Filling birthday details')
                 sleep(3)  # wait for transition
 
-                # Month
-                month_element = wait.until(EC.presence_of_element_located((By.XPATH, '//div[@aria-label="Month"]')))
+                # Month dropdown
+                print("Waiting for Month dropdown to be clickable...")
+                month_element = wait.until(EC.visibility_of_element_located((By.XPATH, '//div[@aria-label="Month"]')))
                 driver.execute_script("arguments[0].click();", month_element)  # Click using JavaScript
+                print(f"Selecting Month: {birthday[0]}")
                 month_option = wait.until(EC.presence_of_element_located((By.XPATH, f'//div[text()="{birthday[0]}"]')))
                 driver.execute_script("arguments[0].click();", month_option)
                 sleep(0.5)
 
-                # Day
-                day_element = wait.until(EC.presence_of_element_located((By.XPATH, '//div[@aria-label="Day"]')))
+                # Day dropdown
+                print("Waiting for Day dropdown to be clickable...")
+                day_element = wait.until(EC.visibility_of_element_located((By.XPATH, '//div[@aria-label="Day"]')))
                 driver.execute_script("arguments[0].click();", day_element)
+                print(f"Selecting Day: {birthday[1].replace(',', '')}")
                 day_option = wait.until(EC.presence_of_element_located((By.XPATH, f'//div[text()="{birthday[1].replace(",", "")}"]')))
                 driver.execute_script("arguments[0].click();", day_option)
                 sleep(0.5)
 
-                # Year
-                year_element = wait.until(EC.presence_of_element_located((By.XPATH, '//div[@aria-label="Year"]')))
+                # Year dropdown
+                print("Waiting for Year dropdown to be clickable...")
+                year_element = wait.until(EC.visibility_of_element_located((By.XPATH, '//div[@aria-label="Year"]')))
                 driver.execute_script("arguments[0].click();", year_element)
+                print(f"Selecting Year: {birthday[2]}")
                 year_option = wait.until(EC.presence_of_element_located((By.XPATH, f'//div[text()="{birthday[2]}"]')))
                 driver.execute_script("arguments[0].click();", year_option)
                 sleep(0.5)
 
                 # Next Button
+                print("Clicking Next button")
                 next_button = wait.until(EC.element_to_be_clickable((By.XPATH, '//button[text()="Next"]')))
                 next_button.click()
                 sleep(3)
@@ -136,6 +143,7 @@ class AccountCreator():
 
         except Exception as e:
             print(f"[FATAL ERROR] {e}")
+            driver.save_screenshot("error.png")
 
         finally:
             driver.quit()
