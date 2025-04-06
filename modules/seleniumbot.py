@@ -16,7 +16,7 @@ from selenium.webdriver import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support.ui import WebDriverWait, Select
 from selenium.webdriver.support import expected_conditions as EC
 import requests
 import re
@@ -95,31 +95,31 @@ class AccountCreator():
                 submit_button.click()
             sleep(5)
 
-            # Fill birthday (Custom dropdown)
+            # Fill birthday
             birthday = account_info["birthday"].split(" ")
             try:
                 print('Filling birthday details')
-                sleep(3)  # let transition complete
+                sleep(3)  # wait for transition
 
                 # Month
                 month_element = wait.until(EC.presence_of_element_located((By.XPATH, '//div[@aria-label="Month"]')))
-                month_element.click()
+                driver.execute_script("arguments[0].click();", month_element)  # Click using JavaScript
                 month_option = wait.until(EC.presence_of_element_located((By.XPATH, f'//div[text()="{birthday[0]}"]')))
-                month_option.click()
+                driver.execute_script("arguments[0].click();", month_option)
                 sleep(0.5)
 
                 # Day
                 day_element = wait.until(EC.presence_of_element_located((By.XPATH, '//div[@aria-label="Day"]')))
-                day_element.click()
+                driver.execute_script("arguments[0].click();", day_element)
                 day_option = wait.until(EC.presence_of_element_located((By.XPATH, f'//div[text()="{birthday[1].replace(",", "")}"]')))
-                day_option.click()
+                driver.execute_script("arguments[0].click();", day_option)
                 sleep(0.5)
 
                 # Year
                 year_element = wait.until(EC.presence_of_element_located((By.XPATH, '//div[@aria-label="Year"]')))
-                year_element.click()
+                driver.execute_script("arguments[0].click();", year_element)
                 year_option = wait.until(EC.presence_of_element_located((By.XPATH, f'//div[text()="{birthday[2]}"]')))
-                year_option.click()
+                driver.execute_script("arguments[0].click();", year_option)
                 sleep(0.5)
 
                 # Next Button
