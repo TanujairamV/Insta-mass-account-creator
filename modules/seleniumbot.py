@@ -5,6 +5,7 @@
 
 from time import sleep
 from random import randint
+import logging
 
 import modules.config as config
 import modules.generateaccountinformation as accnt
@@ -15,11 +16,12 @@ from selenium.webdriver import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support.ui import WebDriverWait, Select
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import Select
 import requests
 import re
+
+logging.basicConfig(level=logging.INFO)
 
 class AccountCreator():
     account_created = 0
@@ -33,7 +35,7 @@ class AccountCreator():
 
     def __collect_sockets(self):
         r = requests.get("https://www.sslproxies.org/")
-        matches = re.findall(r"<td>\d+.\d+.\d+.\d+</td><td>\d+</td>", r.text)
+        matches = re.findall(r"<td>\d+\.\d+\.\d+\.\d+</td><td>\d+</td>", r.text)
         revised_list = [m1.replace("<td>", "") for m1 in matches]
         for socket_str in revised_list:
             self.sockets.append(socket_str[:-5].replace("</td>", ":"))
@@ -57,6 +59,8 @@ class AccountCreator():
             wait = WebDriverWait(driver, 15)
             action_chains = ActionChains(driver)
             account_info = accnt.new_account()
+
+            logging.info(f"Username: {account_info['username']}")
 
             # Fill email
             print('Filling email field')
@@ -95,25 +99,24 @@ class AccountCreator():
             birthday = account_info["birthday"].split(" ")
             try:
                 print('Filling birthday details')
+                sleep(3)  # wait for transition
 
-                # Month
-                month_select_elem = wait.until(EC.presence_of_element_located((By.XPATH, '//select[@title="Month:"]')))
+                month_select_elem = wait.until(EC.presence_of_element_located((By.XPATH, '//select[contains(@aria-label, "Month")]')))
                 Select(month_select_elem).select_by_visible_text(birthday[0])
                 sleep(1)
 
-                # Day
-                day_select_elem = wait.until(EC.presence_of_element_located((By.XPATH, '//select[@title="Day:"]')))
+                day_select_elem = wait.until(EC.presence_of_element_located((By.XPATH, '//select[contains(@aria-label, "Day")]')))
                 Select(day_select_elem).select_by_visible_text(birthday[1][:-1])
                 sleep(1)
 
-                # Year
-                year_select_elem = wait.until(EC.presence_of_element_located((By.XPATH, '//select[@title="Year:"]')))
+                year_select_elem = wait.until(EC.presence_of_element_located((By.XPATH, '//select[contains(@aria-label, "Year")]')))
                 Select(year_select_elem).select_by_visible_text(birthday[2])
                 sleep(1)
 
                 next_button = wait.until(EC.element_to_be_clickable((By.XPATH, '//button[text()="Next"]')))
                 next_button.click()
                 sleep(3)
+
             except Exception as e:
                 print(f"[WARNING] Skipping birthday selection: {e}")
 
