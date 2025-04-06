@@ -99,26 +99,24 @@ class AccountCreator():
             birthday = account_info["birthday"].split(" ")
             try:
                 print('Filling birthday details')
-                sleep(3)  # wait for transition
+                wait.until(EC.presence_of_element_located((By.XPATH, '//select[contains(@aria-label, "Month")]')))
+                sleep(2)
 
-                month_select_elem = wait.until(EC.presence_of_element_located((By.XPATH, '//select[contains(@aria-label, "Month")]')))
+                month_select_elem = driver.find_element(By.XPATH, '//select[contains(@aria-label, "Month")]')
                 Select(month_select_elem).select_by_visible_text(birthday[0])
-                sleep(1)
 
-                day_select_elem = wait.until(EC.presence_of_element_located((By.XPATH, '//select[contains(@aria-label, "Day")]')))
+                day_select_elem = driver.find_element(By.XPATH, '//select[contains(@aria-label, "Day")]')
                 Select(day_select_elem).select_by_visible_text(birthday[1][:-1])
-                sleep(1)
 
-                year_select_elem = wait.until(EC.presence_of_element_located((By.XPATH, '//select[contains(@aria-label, "Year")]')))
+                year_select_elem = driver.find_element(By.XPATH, '//select[contains(@aria-label, "Year")]')
                 Select(year_select_elem).select_by_visible_text(birthday[2])
-                sleep(1)
 
                 next_button = wait.until(EC.element_to_be_clickable((By.XPATH, '//button[text()="Next"]')))
                 next_button.click()
                 sleep(3)
 
             except Exception as e:
-                print(f"[WARNING] Skipping birthday selection: {e}")
+                logging.warning(f"Skipping birthday selection: {e}")
 
             store(account_info)
             print(f"[INFO] Account created: {account_info['username']}")
