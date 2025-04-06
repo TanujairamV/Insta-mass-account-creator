@@ -5,14 +5,17 @@ import modules.generateaccountinformation as accnt
 from modules.storeusername import store
 from selenium import webdriver
 from selenium.webdriver import ActionChains
-from selenium.webdriver.chrome.service import Service  # Import Service
-from selenium.webdriver.common.by import By  # Use By to locate elements
-from selenium.webdriver.chrome.options import Options  # Use Options for setting chrome options
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 import requests
 import re
+import logging
 
 class AccountCreator():
     account_created = 0
+
     def __init__(self, use_custom_proxy, use_local_ip_address):
         self.sockets = []
         self.use_custom_proxy = use_custom_proxy
@@ -28,15 +31,16 @@ class AccountCreator():
             self.sockets.append(socket_str[:-5].replace("</td>", ":"))
 
     def createaccount(self, proxy=None):
-        chrome_options = Options()  # Use Options instead of ChromeOptions
+        chrome_options = webdriver.ChromeOptions()
         if proxy != None:
             chrome_options.add_argument('--proxy-server=%s' % proxy)
 
+        # Set user-agent and window size
+        chrome_options.add_argument('--user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.80 Safari/537.36"')
         chrome_options.add_argument('window-size=1200x600')
 
-        # Initialize Service with the path to chromedriver
-        service = Service(executable_path=config.Config['chromedriver_path'])
-        driver = webdriver.Chrome(service=service, options=chrome_options)  # Pass 'service' and 'options'
+        # Initialize the driver
+        driver = webdriver.Chrome(options=chrome_options, executable_path=config.Config['chromedriver_path'])
         print('Opening Browser')
         driver.get(self.url)
         print('Browser Opened')
@@ -46,73 +50,70 @@ class AccountCreator():
         sleep(5)
         account_info = accnt.new_account()
 
-        # fill the email value
+        # Fill the email field
         print('Filling email field')
-        email_field = driver.find_element(By.NAME, 'emailOrPhone')
+        email_field = driver.find_element_by_name('emailOrPhone')
         sleep(1)
         action_chains.move_to_element(email_field)
         email_field.send_keys(str(account_info["email"]))
         sleep(2)
 
-        # fill the fullname value
+        # Fill the fullname field
         print('Filling fullname field')
-        fullname_field = driver.find_element(By.NAME, 'fullName')
+        fullname_field = driver.find_element_by_name('fullName')
         action_chains.move_to_element(fullname_field)
         fullname_field.send_keys(account_info["name"])
         sleep(2)
 
-        # fill username value
+        # Fill the username field
         print('Filling username field')
-        username_field = driver.find_element(By.NAME, 'username')
+        username_field = driver.find_element_by_name('username')
         action_chains.move_to_element(username_field)
         username_field.send_keys(account_info["username"])
         sleep(2)
 
-        # fill password value
+        # Fill the password field
         print('Filling password field')
-        password_field = driver.find_element(By.NAME, 'password')
+        password_field = driver.find_element_by_name('password')
         action_chains.move_to_element(password_field)
         passW = account_info["password"]
         password_field.send_keys(str(passW))
         sleep(2)
 
-        submit = driver.find_element(By.XPATH, '//*[@id="react-root"]/section/main/div/div/div[1]/div/form/div[7]/div/button')
-        action_chains.move_to_element(submit)
+        # Click the submit button using WebDriverWait to ensure it's clickable
+        submit_button_xpath = '//*[@id="react-root"]/section/main/div/div/div[1]/div/form/div[7]/div/button'
+        submit = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.XPATH, submit_button_xpath))
+        )
         submit.click()
+
         sleep(3)
 
         try:
-            # Birthday selection part
-            month_button = driver.find_element(By.XPATH, '//*[@id="react-root"]/section/main/div/div/div[1]/div/div[4]/div/div/span/span[1]/select')
+            # Handle birthday selection
+            month_button = driver.find_element_by_xpath('//*[@id="react-root"]/section/main/div/div/div[1]/div/div[4]/div/div/span/span[1]/select')
             month_button.click()
-            month_value = account_info["birthday"].split(" ")[0]
-            month_button.send_keys(month_value)  # Month selection
+            month_button.send_keys(account_info["birthday"].split(" ")[0])
             sleep(1)
-
-            day_button = driver.find_element(By.XPATH, '//*[@id="react-root"]/section/main/div/div/div[1]/div/div[4]/div/div/span/span[2]/select')
+            day_button = driver.find_element_by_xpath('//*[@id="react-root"]/section/main/div/div/div[1]/div/div[4]/div/div/span/span[2]/select')
             day_button.click()
-            day_value = account_info["birthday"].split(" ")[1][:-1]  # Removing trailing comma
-            day_button.send_keys(day_value)  # Day selection
+            day_button.send_keys(account_info["birthday"].split(" ")[1][:-1])
             sleep(1)
-
-            year_button = driver.find_element(By.XPATH, '//*[@id="react-root"]/section/main/div/div/div[1]/div/div[4]/div/div/span/span[3]/select')
+            year_button = driver.find_element_by_xpath('//*[@id="react-root"]/section/main/div/div/div[1]/div/div[4]/div/div/span/span[3]/select')
             year_button.click()
-            year_value = account_info["birthday"].split(" ")[2]
-            year_button.send_keys(year_value)  # Year selection
+            year_button.send_keys(account_info["birthday"].split(" ")[2])
 
             sleep(2)
-            next_button = driver.find_elements(By.XPATH, '//*[@id="react-root"]/section/main/div/div/div[1]/div/div[6]/button')
+            next_button = driver.find_elements_by_xpath('//*[@id="react-root"]/section/main/div/div/div[1]/div/div[6]/button')
             next_button.click()
 
         except Exception as e:
-            print(f"Error in birthday selection: {e}")
-            pass
+            print(f"Error in filling birthday details: {e}")
 
         sleep(4)
-        # After filling the account, save the account_info
+        # Save the account information after the first step
         store(account_info)
-        
-        # Close the driver after account creation
+
         driver.close()
 
     def creation_config(self):
@@ -125,7 +126,7 @@ class AccountCreator():
                             try:
                                 self.createaccount(current_socket)
                             except Exception as e:
-                                print('Error!, Trying another Proxy {}'.format(current_socket))
+                                print(f'Error! Trying another Proxy {current_socket}')
                                 self.createaccount(current_socket)
 
                 else:
@@ -134,13 +135,15 @@ class AccountCreator():
                         for proxy in content:
                             amount_per_proxy = config.Config['amount_per_proxy']
                             if amount_per_proxy != 0:
+                                print(f"Creating {amount_per_proxy} amount of users for this proxy")
                                 for i in range(0, amount_per_proxy):
                                     try:
                                         self.createaccount(proxy)
                                     except Exception as e:
-                                        print(f"Error: {e}")
+                                        print(f"An error has occurred: {e}")
                             else:
                                 random_number = randint(1, 20)
+                                print(f"Creating {random_number} amount of users for this proxy")
                                 for i in range(0, random_number):
                                     try:
                                         self.createaccount(proxy)
@@ -151,11 +154,11 @@ class AccountCreator():
                     try:
                         self.createaccount()
                     except Exception as e:
-                        print(f'Error: {e}')
+                        print(f'Error! Check if your IP might be banned: {e}')
                         self.createaccount()
 
         except Exception as e:
-            print(f"Error: {e}")
+            print(f"Error in creation config: {e}")
 
 def runbot():
     account = AccountCreator(config.Config['use_custom_proxy'], config.Config['use_local_ip_address'])
