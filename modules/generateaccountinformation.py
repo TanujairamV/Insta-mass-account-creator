@@ -34,7 +34,7 @@ def generatePassword(length=12):
 
 # Generate email from username
 def genEmail(username):
-    return username + "@" + str(Config["email_domain"])
+    return f"{username}@1secmail.com"
 
 # Build the full account object
 def new_account():
