@@ -1,6 +1,6 @@
 """ author: feezyhendrix
 
-    main function botcore
+    main function botcore (updated by ChatGPT for email code)
  """
 
 from time import sleep
@@ -9,6 +9,7 @@ from random import randint
 import modules.config as config
 import modules.generateaccountinformation as accnt
 from modules.storeusername import store
+from modules.get_confirmation_code import get_code_from_email
 
 from selenium import webdriver
 from selenium.webdriver import ActionChains
@@ -110,21 +111,34 @@ class AccountCreator():
             except Exception as e:
                 print(f"[WARNING] Skipping birthday selection: {e}")
 
+            # Wait and enter email confirmation code
+            print("[INFO] Waiting for confirmation code...")
+            confirmation_code = get_code_from_email(account_info["username"])
+            if confirmation_code:
+                try:
+                    code_input = wait.until(EC.presence_of_element_located((By.NAME, 'email_confirmation_code')))
+                    code_input.send_keys(confirmation_code)
+
+                    confirm_button = driver.find_element(By.XPATH, '//button[text()="Next"]')
+                    confirm_button.click()
+                    print("[INFO] Confirmation code submitted.")
+                except Exception as e:
+                    print(f"[ERROR] Could not input confirmation code: {e}")
+            else:
+                print("[ERROR] No confirmation code received. Aborting...")
+                return
+
+            # Store and print credentials
             store(account_info)
-            print(f"[INFO] Account created: {account_info['username']}")
-
-            # ✅ Output username and password
-            print(f"[OUTPUT] Username: {account_info['username']}")
-            print(f"[OUTPUT] Password: {account_info['password']}")
-
-            # ✅ Prevent browser from closing
-            input("[INFO] Press ENTER to close the browser manually when done...")
+            print(f"\n[✅ ACCOUNT CREATED SUCCESSFULLY ✅]")
+            print(f"Username: {account_info['username']}")
+            print(f"Password: {account_info['password']}\n")
 
         except Exception as e:
             print(f"[FATAL ERROR] {e}")
-            input("[INFO] Press ENTER to close the browser manually...")  # optional fallback pause
 
-        # Do NOT use driver.quit()
+        # finally:  # Commented out to prevent browser close
+        #     driver.quit()
 
     def creation_config(self):
         try:
@@ -161,7 +175,6 @@ class AccountCreator():
 
         except Exception as e:
             print(f"[FATAL ERROR] {e}")
-
 
 def runbot():
     account = AccountCreator(config.Config['use_custom_proxy'], config.Config['use_local_ip_address'])
