@@ -1,116 +1,102 @@
+import logging
 import time
-import random
-import string
-import re
-import hashlib
 import requests
-
+from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver import ActionChains
-
-import modules.generateaccountinformation as accnt
+from selenium.webdriver.chrome.options import Options
+from modules.generateaccountinformation import new_account
 from modules.storeusername import store
-from modules.config import Config
+import modules.config as config
 
-TEMP_MAIL_API_URL = "https://api.temp-mail.org/request"
-HEADERS = {"User-Agent": "Mozilla/5.0"}
+MAIL_TM_BASE = "https://api.mail.tm"
 
-def generate_random_string(length=10):
-    return ''.join(random.choices(string.ascii_lowercase + string.digits, k=length))
+def create_mail_tm_account():
+    domain = requests.get(f"{MAIL_TM_BASE}/domains").json()["hydra:member"][0]["domain"]
+    email = f"{int(time.time())}@{domain}"
+    password = "instab0tPass123"
 
-def create_temp_email():
-    domains = requests.get(f"{TEMP_MAIL_API_URL}/domains/").json()
-    email_name = generate_random_string()
-    email = f"{email_name}@{domains[0]}"
-    return email, email_name
+    response = requests.post(f"{MAIL_TM_BASE}/accounts", json={"address": email, "password": password})
+    if response.status_code != 201:
+        raise Exception(f"Failed to create temp email: {response.text}")
+    token_resp = requests.post(f"{MAIL_TM_BASE}/token", json={"address": email, "password": password})
+    token = token_resp.json()["token"]
+    return email, password, token
 
-def get_inbox_hash(email):
-    return hashlib.md5(email.encode()).hexdigest()
-
-def get_confirmation_code(email):
-    email_hash = get_inbox_hash(email)
-    print(f"[INFO] Waiting for confirmation code for {email}")
-    for _ in range(60):  # Wait up to 60s
-        try:
-            inbox = requests.get(f"{TEMP_MAIL_API_URL}/mail/id/{email_hash}/", headers=HEADERS).json()
-            if isinstance(inbox, list) and len(inbox) > 0:
-                message = inbox[0]
-                mail_text = message.get("mail_text", "")
-                match = re.search(r"\b\d{6}\b", mail_text)
-                if match:
-                    return match.group(0)
-        except Exception as e:
-            print(f"[DEBUG] No email yet: {e}")
-        time.sleep(5)
-    raise Exception("Confirmation code not received.")
-
-class AccountCreator:
-    def __init__(self):
-        self.url = 'https://www.instagram.com/accounts/emailsignup/'
-
-    def create_account(self):
-        email, login = create_temp_email()
-        account_info = accnt.new_account()
-        account_info["email"] = email
-
-        options = Options()
-        options.add_argument("--disable-blink-features=AutomationControlled")
-        service = Service(Config["chromedriver_path"])
-        driver = webdriver.Chrome(service=service, options=options)
-
-        wait = WebDriverWait(driver, 20)
-        driver.get(self.url)
-        action = ActionChains(driver)
-
-        try:
-            print("[INFO] Filling signup form...")
-            wait.until(EC.presence_of_element_located((By.NAME, 'emailOrPhone'))).send_keys(email)
-            driver.find_element(By.NAME, 'fullName').send_keys(account_info['name'])
-            driver.find_element(By.NAME, 'username').send_keys(account_info['username'])
-            driver.find_element(By.NAME, 'password').send_keys(account_info['password'])
-
-            time.sleep(2)
-            driver.find_element(By.XPATH, "//button[@type='submit']").click()
-            time.sleep(4)
-
-            print("[INFO] Selecting birthday...")
-            birthday = account_info["birthday"].split(" ")
-            wait.until(EC.presence_of_element_located((By.XPATH, '//select[@title="Month:"]'))).send_keys(birthday[0])
-            driver.find_element(By.XPATH, '//select[@title="Day:"]').send_keys(birthday[1][:-1])
-            driver.find_element(By.XPATH, '//select[@title="Year:"]').send_keys(birthday[2])
-            driver.find_element(By.XPATH, '//button[text()="Next"]').click()
-            time.sleep(5)
-
-            print("[INFO] Getting confirmation code...")
-            code = get_confirmation_code(email)
+def get_confirmation_code(token):
+    headers = {"Authorization": f"Bearer {token}"}
+    logging.info("[INFO] Waiting for confirmation code...")
+    for _ in range(60):  # Wait max 60 seconds
+        resp = requests.get(f"{MAIL_TM_BASE}/messages", headers=headers).json()
+        if resp["hydra:member"]:
+            msg_id = resp["hydra:member"][0]["id"]
+            msg = requests.get(f"{MAIL_TM_BASE}/messages/{msg_id}", headers=headers).json()
+            code = extract_code_from_email(msg["text"])
             if code:
-                print(f"[INFO] Confirmation code received: {code}")
-                wait.until(EC.presence_of_element_located((By.NAME, 'email_confirmation_code'))).send_keys(code)
-                driver.find_element(By.XPATH, '//button[text()="Next"]').click()
-            else:
-                print("[ERROR] Confirmation code not found.")
-                return
+                return code
+        time.sleep(2)
+    raise TimeoutError("Confirmation code not received in time.")
 
-            store(account_info)
+def extract_code_from_email(text):
+    import re
+    match = re.search(r'(\d{6})', text)
+    return match.group(1) if match else None
 
-            print("\n✅ Account Created Successfully!")
-            print(f"Username: {account_info['username']}")
-            print(f"Password: {account_info['password']}")
-            print(f"Email: {account_info['email']}\n")
+def run():
+    logging.basicConfig(level=logging.INFO)
+    account_info = new_account()
+    email, email_password, token = create_mail_tm_account()
+    account_info["email"] = email
 
-            input("Press ENTER to close the browser...")
+    logging.info(f"[INFO] Generated temp email: {email}")
 
-        except Exception as e:
-            print(f"[FATAL ERROR] {e}")
-            input("Press ENTER to close the browser manually...")
-        finally:
-            driver.quit()
+    # Setup WebDriver
+    options = Options()
+    options.add_argument("--start-maximized")
+    driver = webdriver.Chrome(service=Service(config.Config["chromedriver_path"]), options=options)
+    wait = WebDriverWait(driver, 20)
 
-def runbot():
-    bot = AccountCreator()
-    bot.create_account()
+    try:
+        logging.info("Opening Instagram signup page...")
+        driver.get("https://www.instagram.com/accounts/emailsignup/")
+
+        wait.until(EC.presence_of_element_located((By.NAME, "emailOrPhone"))).send_keys(email)
+        driver.find_element(By.NAME, "fullName").send_keys(account_info["name"])
+        driver.find_element(By.NAME, "username").send_keys(account_info["username"])
+        driver.find_element(By.NAME, "password").send_keys(account_info["password"])
+        driver.find_element(By.CSS_SELECTOR, 'button[type="submit"]').click()
+
+        # Wait for DOB input to appear
+        time.sleep(3)
+        birthday = account_info["birthday"].split(" ")
+        wait.until(EC.presence_of_element_located((By.XPATH, '//select[@title="Month:"]'))).send_keys(birthday[0])
+        driver.find_element(By.XPATH, '//select[@title="Day:"]').send_keys(birthday[1][:-1])
+        driver.find_element(By.XPATH, '//select[@title="Year:"]').send_keys(birthday[2])
+        driver.find_element(By.XPATH, '//button[text()="Next"]').click()
+
+        # Wait for confirmation code input page
+        logging.info(f"[INFO] Waiting for confirmation code at {email}...")
+        code = get_confirmation_code(token)
+        logging.info(f"[INFO] Got code: {code}")
+
+        wait.until(EC.presence_of_element_located((By.NAME, 'email_confirmation_code'))).send_keys(code)
+        driver.find_element(By.XPATH, '//button[text()="Next"]').click()
+
+        # Store credentials
+        store(account_info)
+        logging.info(f"[SUCCESS] Account created: {account_info['username']}")
+        logging.info(f"Username: {account_info['username']}")
+        logging.info(f"Password: {account_info['password']}")
+
+        input("Press ENTER to close browser...")  # keeps browser open for inspection
+
+    except Exception as e:
+        logging.error(f"[ERROR] Something went wrong: {e}")
+    # finally:
+    #     driver.quit()  # Commented out to keep browser open
+
+if __name__ == "__main__":
+    run()
