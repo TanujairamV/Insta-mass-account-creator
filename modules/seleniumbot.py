@@ -1,9 +1,20 @@
+import requests
+import re
+from selenium.webdriver import ActionChains, Service, Options
+from selenium import webdriver
+from time import sleep
+from random import randint
+import config
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 class AccountCreator():
     account_created = 0
+
+    def store(account_info):
+    with open("accounts.txt", "a") as f:
+        f.write(f"Email: {account_info['email']}, Username: {account_info['username']}, Password: {account_info['password']}\n")
 
     def __init__(self, use_custom_proxy, use_local_ip_address):
         self.sockets = []
