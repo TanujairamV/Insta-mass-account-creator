@@ -17,6 +17,7 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import Select
 import requests
 import re
 
@@ -85,34 +86,32 @@ class AccountCreator():
             print('Clicking signup button')
             submit_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[type="submit"]')))
             try:
-                print('Trying ActionChains click')
                 action_chains.move_to_element(submit_button).click().perform()
             except:
-                try:
-                    print('Trying JavaScript click')
-                    driver.execute_script("arguments[0].click();", submit_button)
-                except:
-                    print('Trying regular click')
-                    submit_button.click()
+                submit_button.click()
             sleep(5)
 
             # Fill birthday
             birthday = account_info["birthday"].split(" ")
             try:
                 print('Filling birthday details')
-                month_select = wait.until(EC.presence_of_element_located((By.XPATH, '//select[@title="Month:"]')))
-                month_select.send_keys(birthday[0])
+
+                # Month
+                month_select_elem = wait.until(EC.presence_of_element_located((By.XPATH, '//select[@title="Month:"]')))
+                Select(month_select_elem).select_by_visible_text(birthday[0])
                 sleep(1)
 
-                day_select = driver.find_element(By.XPATH, '//select[@title="Day:"]')
-                day_select.send_keys(birthday[1][:-1])
+                # Day
+                day_select_elem = wait.until(EC.presence_of_element_located((By.XPATH, '//select[@title="Day:"]')))
+                Select(day_select_elem).select_by_visible_text(birthday[1][:-1])
                 sleep(1)
 
-                year_select = driver.find_element(By.XPATH, '//select[@title="Year:"]')
-                year_select.send_keys(birthday[2])
+                # Year
+                year_select_elem = wait.until(EC.presence_of_element_located((By.XPATH, '//select[@title="Year:"]')))
+                Select(year_select_elem).select_by_visible_text(birthday[2])
                 sleep(1)
 
-                next_button = driver.find_element(By.XPATH, '//button[text()="Next"]')
+                next_button = wait.until(EC.element_to_be_clickable((By.XPATH, '//button[text()="Next"]')))
                 next_button.click()
                 sleep(3)
             except Exception as e:
