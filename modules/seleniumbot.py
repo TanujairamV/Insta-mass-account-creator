@@ -30,7 +30,9 @@ class AccountCreator():
             chrome_options.add_argument('--proxy-server=%s' % proxy)
 
         chrome_options.add_argument('window-size=1200x600')
-        driver = webdriver.Chrome(chrome_options=chrome_options, executable_path=config.Config['chromedriver_path'])
+        
+        # Replace 'chrome_options' with 'options'
+        driver = webdriver.Chrome(options=chrome_options, executable_path=config.Config['chromedriver_path'])
         print('Opening Browser')
         driver.get(self.url)
         print('Browser Opened')
