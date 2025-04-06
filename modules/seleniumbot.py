@@ -86,7 +86,7 @@ class AccountCreator():
         sleep(2)
 
         # Click Sign up
-        submit = driver.find_element(By.XPATH, '//*[@id="react-root"]/section/main/div/div/div[1]/div/form/div[7]/div/button')
+        submit = driver.find_element(By.XPATH, '//button[@type="submit"]')
         action_chains.move_to_element(submit)
         sleep(2)
         submit.click()
