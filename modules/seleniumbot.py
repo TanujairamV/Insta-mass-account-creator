@@ -20,6 +20,7 @@ from selenium.webdriver.support import expected_conditions as EC
 import requests
 import re
 
+
 class AccountCreator():
     account_created = 0
 
@@ -112,12 +113,18 @@ class AccountCreator():
             store(account_info)
             print(f"[INFO] Account created: {account_info['username']}")
 
+            # ✅ Output username and password
+            print(f"[OUTPUT] Username: {account_info['username']}")
+            print(f"[OUTPUT] Password: {account_info['password']}")
+
+            # ✅ Prevent browser from closing
+            input("[INFO] Press ENTER to close the browser manually when done...")
+
         except Exception as e:
             print(f"[FATAL ERROR] {e}")
-"""
-        finally:
-            driver.quit()
-"""
+            input("[INFO] Press ENTER to close the browser manually...")  # optional fallback pause
+
+        # Do NOT use driver.quit()
 
     def creation_config(self):
         try:
@@ -154,6 +161,7 @@ class AccountCreator():
 
         except Exception as e:
             print(f"[FATAL ERROR] {e}")
+
 
 def runbot():
     account = AccountCreator(config.Config['use_custom_proxy'], config.Config['use_local_ip_address'])
