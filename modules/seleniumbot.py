@@ -99,23 +99,30 @@ class AccountCreator():
             birthday = account_info["birthday"].split(" ")
             try:
                 print('Filling birthday details')
-                wait.until(EC.presence_of_element_located((By.XPATH, '//select[contains(@aria-label, "Month")]')))
-                sleep(2)
+                sleep(3)  # let transition complete
 
-                month_select_elem = driver.find_element(By.XPATH, '//select[contains(@aria-label, "Month")]')
-                Select(month_select_elem).select_by_visible_text(birthday[0])
+                # Month
+                month_select = wait.until(EC.presence_of_element_located((By.XPATH, '//select[contains(@aria-label, "Month")]')))
+                Select(month_select).select_by_visible_text(birthday[0])
+                sleep(0.5)
 
-                day_select_elem = driver.find_element(By.XPATH, '//select[contains(@aria-label, "Day")]')
-                Select(day_select_elem).select_by_visible_text(birthday[1][:-1])
+                # Day
+                day_select = wait.until(EC.presence_of_element_located((By.XPATH, '//select[contains(@aria-label, "Day")]')))
+                Select(day_select).select_by_visible_text(birthday[1].replace(',', ''))
+                sleep(0.5)
 
-                year_select_elem = driver.find_element(By.XPATH, '//select[contains(@aria-label, "Year")]')
-                Select(year_select_elem).select_by_visible_text(birthday[2])
+                # Year
+                year_select = wait.until(EC.presence_of_element_located((By.XPATH, '//select[contains(@aria-label, "Year")]')))
+                Select(year_select).select_by_visible_text(birthday[2])
+                sleep(0.5)
 
+                # Next Button
                 next_button = wait.until(EC.element_to_be_clickable((By.XPATH, '//button[text()="Next"]')))
                 next_button.click()
                 sleep(3)
 
             except Exception as e:
+                driver.save_screenshot("birthday_error.png")
                 logging.warning(f"Skipping birthday selection: {e}")
 
             store(account_info)
@@ -166,3 +173,4 @@ class AccountCreator():
 def runbot():
     account = AccountCreator(config.Config['use_custom_proxy'], config.Config['use_local_ip_address'])
     account.creation_config()
+
