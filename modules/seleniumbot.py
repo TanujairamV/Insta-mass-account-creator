@@ -1,20 +1,6 @@
-from time import sleep
-from random import randint
-
-import modules.config as config
-# importing generated info
-import modules.generateaccountinformation as accnt
-from modules.storeusername import store
-# from .activate_account import get_activation_url
-# library import
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver import ActionChains
-import requests
-import re
-import logging
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 class AccountCreator():
     account_created = 0
@@ -108,17 +94,26 @@ class AccountCreator():
         sleep(3)
 
         try:
-            month_button = driver.find_element(By.XPATH, '//*[@id="react-root"]/section/main/div/div/div[1]/div/div[4]/div/div/span/span[1]/select')
-            month_button.click()
-            month_button.send_keys(account_info["birthday"].split(" ")[0])
+            # Use WebDriverWait to ensure elements are loaded before interaction
+            month_dropdown = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.XPATH, "//select[@name='birthday_month']"))
+            )
+            month_dropdown.click()
+            month_dropdown.send_keys(account_info["birthday"].split(" ")[0])
             sleep(1)
-            day_button = driver.find_element(By.XPATH, '//*[@id="react-root"]/section/main/div/div/div[1]/div/div[4]/div/div/span/span[2]/select')
-            day_button.click()
-            day_button.send_keys(account_info["birthday"].split(" ")[1][:-1])
+
+            day_dropdown = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.XPATH, "//select[@name='birthday_day']"))
+            )
+            day_dropdown.click()
+            day_dropdown.send_keys(account_info["birthday"].split(" ")[1][:-1])
             sleep(1)
-            year_button = driver.find_element(By.XPATH, '//*[@id="react-root"]/section/main/div/div/div[1]/div/div[4]/div/div/span/span[3]/select')
-            year_button.click()
-            year_button.send_keys(account_info["birthday"].split(" ")[2])
+
+            year_dropdown = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.XPATH, "//select[@name='birthday_year']"))
+            )
+            year_dropdown.click()
+            year_dropdown.send_keys(account_info["birthday"].split(" ")[2])
 
             sleep(2)
             next_button = driver.find_elements(By.XPATH, '//*[@id="react-root"]/section/main/div/div/div[1]/div/div[6]/button')
