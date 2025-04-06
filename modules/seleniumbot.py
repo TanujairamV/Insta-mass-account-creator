@@ -2,6 +2,7 @@ import requests
 import re
 from selenium.webdriver import ActionChains, Service, Options
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
 from time import sleep
 from random import randint
 import config
